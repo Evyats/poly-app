@@ -1,70 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
+from datetime import date
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from backend.core.storage import JsonStore
+from backend.core.auth import get_current_user
+from backend.core.bootstrap import DEFAULT_TASKS, ensure_routine_day
+from backend.core.db import get_db
+from backend.core.models import RoutineTask, User
 
 router = APIRouter(prefix="/api/routine", tags=["routine"])
-
-
-def _today() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
-
-
-DEFAULT_TASKS = [
-    {
-        "id": "t1",
-        "label": "Read high-quality existing GitHub code (20 min)",
-        "isTimed": True,
-        "initialSeconds": 20 * 60,
-    },
-    {
-        "id": "t2",
-        "label": "Use a new AI tool (30 min)",
-        "isTimed": True,
-        "initialSeconds": 30 * 60,
-    },
-    {
-        "id": "t3",
-        "label": "Generate 3 ChatGPT programming questions",
-        "isTimed": False,
-        "initialSeconds": 0,
-    },
-    {
-        "id": "t4",
-        "label": "Commit changes to codebase and push to GitHub",
-        "isTimed": False,
-        "initialSeconds": 0,
-    },
-]
-
-
-def _default_state() -> dict:
-    return {
-        "date": _today(),
-        "studySeconds": 0,
-        "tasks": [
-            {
-                "id": task["id"],
-                "label": task["label"],
-                "isTimed": task["isTimed"],
-                "initialSeconds": task["initialSeconds"],
-                "remainingSeconds": task["initialSeconds"],
-                "completed": False,
-            }
-            for task in DEFAULT_TASKS
-        ],
-    }
-
-
-store = JsonStore(
-    Path(__file__).resolve().parents[1] / "data" / "routine.json",
-    _default_state,
-)
 
 
 class TaskUpdate(BaseModel):
@@ -78,25 +26,59 @@ class RoutineUpdate(BaseModel):
     tasks: list[TaskUpdate]
 
 
-@router.get("/today")
-def get_today() -> dict:
-    def updater(data: dict) -> dict:
-        if data.get("date") != _today():
-            return _default_state()
-        return data
+def _day_payload(db: Session, user: User, target_day: date) -> dict:
+    routine_day = ensure_routine_day(db, user, target_day)
 
-    return store.update(updater)
+    tasks = list(
+        db.scalars(
+            select(RoutineTask)
+            .where(RoutineTask.routine_day_id == routine_day.id)
+            .order_by(RoutineTask.task_id)
+        )
+    )
+
+    task_by_id = {task.task_id: task for task in tasks}
+    ordered = [task_by_id.get(definition["id"]) for definition in DEFAULT_TASKS]
+
+    return {
+        "date": routine_day.entry_date.isoformat(),
+        "studySeconds": routine_day.study_seconds,
+        "tasks": [
+            {
+                "id": task.task_id,
+                "label": task.label,
+                "isTimed": task.is_timed,
+                "initialSeconds": task.initial_seconds,
+                "remainingSeconds": task.remaining_seconds,
+                "completed": task.completed,
+            }
+            for task in ordered
+            if task is not None
+        ],
+    }
+
+
+@router.get("/today")
+def get_today(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    payload = _day_payload(db, user, date.today())
+    db.commit()
+    return payload
 
 
 @router.put("/today")
-def put_today(payload: RoutineUpdate) -> dict:
-    new_payload = _default_state()
-    new_payload["studySeconds"] = payload.studySeconds
-    by_id = {task.id: task for task in payload.tasks}
-    for task in new_payload["tasks"]:
-        incoming = by_id.get(task["id"])
-        if incoming:
-            task["remainingSeconds"] = incoming.remainingSeconds
-            task["completed"] = incoming.completed
+def put_today(payload: RoutineUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    today = date.today()
+    routine_day = ensure_routine_day(db, user, today)
+    routine_day.study_seconds = payload.studySeconds
 
-    return store.write(new_payload)
+    by_id = {item.id: item for item in payload.tasks}
+    tasks = list(db.scalars(select(RoutineTask).where(RoutineTask.routine_day_id == routine_day.id)))
+    for task in tasks:
+        incoming = by_id.get(task.task_id)
+        if incoming is not None:
+            task.remaining_seconds = incoming.remainingSeconds
+            task.completed = incoming.completed
+
+    db.commit()
+    return _day_payload(db, user, today)
+

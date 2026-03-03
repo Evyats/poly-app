@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polyapp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: polyapp
+      POSTGRES_USER: polyapp
+      POSTGRES_PASSWORD: polyapp
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./.postgres-data:/var/lib/postgresql/data

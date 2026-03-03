@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import mimetypes
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
+from backend.core.bootstrap import seed_default_data
+from backend.core.db import init_db
+from backend.core.settings import CORS_ORIGINS, SESSION_SECRET_KEY
+from backend.services.auth import router as auth_router
 from backend.services.reps import router as reps_router
 from backend.services.routine import router as routine_router
 from backend.services.wakeup import router as wakeup_router
@@ -17,14 +23,31 @@ from backend.services.weight import router as weight_router
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("application/javascript", ".mjs")
 
-app = FastAPI(title="PolyApp API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    seed_default_data()
+    yield
+
+
+app = FastAPI(title="PolyApp API", lifespan=lifespan)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET_KEY,
+    same_site="lax",
+    https_only=False,
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
+
+app.include_router(auth_router)
 app.include_router(reps_router)
 app.include_router(wakeup_router)
 app.include_router(weight_router)

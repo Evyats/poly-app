@@ -1,8 +1,11 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
+import type { AuthUser } from "../lib/types";
 
 type LayoutProps = {
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  user: AuthUser;
+  onLogout: () => Promise<void>;
 };
 
 const navItems = [
@@ -13,7 +16,7 @@ const navItems = [
   { to: "/routine", label: "Routine" },
 ];
 
-export function Layout({ theme, onToggleTheme }: LayoutProps) {
+export function Layout({ theme, onToggleTheme, user, onLogout }: LayoutProps) {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/90 backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/80">
@@ -44,6 +47,16 @@ export function Layout({ theme, onToggleTheme }: LayoutProps) {
               className="rounded-full border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-200 dark:border-slate-700 dark:hover:bg-slate-800"
             >
               {theme === "light" ? "Dark" : "Light"}
+            </button>
+            <span className="rounded-full bg-slate-200 px-3 py-1.5 text-xs dark:bg-slate-800">
+              {user.email ?? user.username}
+            </span>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-full border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-200 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Logout
             </button>
           </nav>
         </div>

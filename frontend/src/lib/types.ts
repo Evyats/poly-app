@@ -39,3 +39,9 @@ export type RoutineState = {
   studySeconds: number;
   tasks: RoutineTask[];
 };
+
+export type AuthUser = {
+  id: number;
+  email: string | null;
+  username: string;
+};

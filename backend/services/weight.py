@@ -1,56 +1,80 @@
 from __future__ import annotations
 
-from pathlib import Path
+from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from backend.core.storage import JsonStore
+from backend.core.auth import get_current_user
+from backend.core.db import get_db
+from backend.core.models import User, WeightEntry
 
 router = APIRouter(prefix="/api/weight", tags=["weight"])
-store = JsonStore(
-    Path(__file__).resolve().parents[1] / "data" / "weight.json",
-    lambda: {
-        "entries": [
-            {"date": "2026-02-16", "weight": 79.9},
-            {"date": "2026-02-18", "weight": 79.5},
-            {"date": "2026-02-20", "weight": 79.4},
-            {"date": "2026-02-22", "weight": 79.0},
-            {"date": "2026-02-24", "weight": 78.8},
-        ]
-    },
-)
 
 
-class WeightEntry(BaseModel):
+class WeightPayload(BaseModel):
     date: str = Field(min_length=10, max_length=10)
     weight: float = Field(gt=0)
 
 
+def _entries_payload(db: Session, user_id: int) -> dict:
+    entries = list(
+        db.scalars(
+            select(WeightEntry)
+            .where(WeightEntry.user_id == user_id)
+            .order_by(WeightEntry.entry_date)
+        )
+    )
+    return {
+        "entries": [
+            {
+                "date": entry.entry_date.isoformat(),
+                "weight": entry.weight,
+            }
+            for entry in entries
+        ]
+    }
+
+
 @router.get("/entries")
-def list_entries() -> dict:
-    data = store.read()
-    data["entries"] = sorted(data["entries"], key=lambda x: x["date"])
-    return data
+def list_entries(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    return _entries_payload(db, user.id)
 
 
 @router.put("/entries")
-def upsert_entry(payload: WeightEntry) -> dict:
-    def updater(data: dict) -> dict:
-        data["entries"] = [e for e in data["entries"] if e["date"] != payload.date]
-        data["entries"].append({"date": payload.date, "weight": payload.weight})
-        return data
+def upsert_entry(payload: WeightPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    entry_date = date.fromisoformat(payload.date)
 
-    return store.update(updater)
+    existing = db.scalar(
+        select(WeightEntry).where(
+            WeightEntry.user_id == user.id,
+            WeightEntry.entry_date == entry_date,
+        )
+    )
+    if existing is None:
+        db.add(WeightEntry(user_id=user.id, entry_date=entry_date, weight=payload.weight))
+    else:
+        existing.weight = payload.weight
+
+    db.commit()
+    return _entries_payload(db, user.id)
 
 
-@router.delete("/entries/{date}")
-def delete_entry(date: str) -> dict:
-    def updater(data: dict) -> dict:
-        before = len(data["entries"])
-        data["entries"] = [e for e in data["entries"] if e["date"] != date]
-        if len(data["entries"]) == before:
-            raise HTTPException(status_code=404, detail="Entry not found")
-        return data
+@router.delete("/entries/{entry_date}")
+def delete_entry(entry_date: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    target_date = date.fromisoformat(entry_date)
+    existing = db.scalar(
+        select(WeightEntry).where(
+            WeightEntry.user_id == user.id,
+            WeightEntry.entry_date == target_date,
+        )
+    )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Entry not found")
 
-    return store.update(updater)
+    db.delete(existing)
+    db.commit()
+    return _entries_payload(db, user.id)
+

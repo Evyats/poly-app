@@ -5,8 +5,28 @@ PolyApp is a browser-based mini-app hub for personal tracking tools.
 ## Stack
 
 - Frontend: React + TypeScript + Tailwind CSS + Recharts
-- Backend: FastAPI microservices (reps, wake-up, weight, routine)
+- Backend: FastAPI microservices (reps, wake-up, weight, routine) + SQLAlchemy
+- Database: PostgreSQL (Docker Compose)
 - Serving: `uvicorn` for backend APIs; can also serve built React app from FastAPI
+
+## Auth
+
+- Two auth behaviors are supported via config (`AUTH_MODE`):
+  - `oauth`: real Google login
+  - `dev_auto`: automatic login as a default DB user (for local testing)
+- Only emails in the whitelist can access the app.
+- Whitelist is stored in DB table `allowed_emails` and seeded from `ALLOWED_EMAILS` env var on startup.
+- Sessions are cookie-based (server-side session middleware).
+- Data is user-scoped in SQL tables by `user_id`.
+
+## Auth Config (backend `.env`)
+
+- `AUTH_MODE=oauth|dev_auto`
+- `DEFAULT_APP_USERNAME=evyats`
+- `DEFAULT_APP_EMAIL=` (optional)
+- `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` (required for `oauth`)
+- `ALLOWED_EMAILS=a@x.com,b@y.com` (required for `oauth`)
+- `SESSION_SECRET_KEY=<long-random-secret>`
 
 ## Features
 
@@ -35,16 +55,20 @@ PolyApp is a browser-based mini-app hub for personal tracking tools.
 
 ## Run (development)
 
-1. Backend:
+1. Start PostgreSQL (Docker):
+   - `docker compose up postgres`
+2. Backend:
    - `python -m venv .venv`
    - `.venv\\Scripts\\activate`
    - `pip install -r backend/requirements.txt`
+   - create `.env` in repo root (see `.env.example`)
    - `uvicorn backend.main:app --reload --port 8000`
-2. Frontend (separate terminal):
+3. Frontend (separate terminal):
    - `cd frontend`
    - `npm install`
+   - create `frontend/.env` (see `frontend/.env.example`)
    - `npm run dev`
-3. Open `http://localhost:5173`
+4. Open `http://localhost:5173`
 
 ## Run via Uvicorn (serve built React from FastAPI)
 
@@ -52,9 +76,32 @@ PolyApp is a browser-based mini-app hub for personal tracking tools.
    - `cd frontend`
    - `npm install`
    - `npm run build`
-2. Start backend from repo root:
+2. Ensure PostgreSQL is running:
+   - `docker compose up postgres`
+3. Start backend from repo root:
    - `uvicorn backend.main:app --reload --port 8000`
-3. Open `http://localhost:8000`
+4. Open `http://localhost:8000`
+
+## Google OAuth Setup
+
+1. In Google Cloud Console, configure OAuth consent screen:
+   - choose `External` (or `Internal` if using Workspace only)
+   - add your app name/support email
+   - add test users if app is in testing mode
+2. Create OAuth Client ID (Web application).
+3. Add Authorized JavaScript origins:
+   - `http://localhost:5173`
+   - `http://127.0.0.1:5173`
+   - `http://localhost:8000`
+   - `http://127.0.0.1:8000`
+4. Add backend and frontend env values:
+   - repo `.env`:
+     - `GOOGLE_CLIENT_ID=...apps.googleusercontent.com`
+     - `ALLOWED_EMAILS=you@example.com,friend@example.com`
+     - `SESSION_SECRET_KEY=<long-random-secret>`
+   - `frontend/.env`:
+     - `VITE_GOOGLE_CLIENT_ID=...apps.googleusercontent.com`
+5. Restart backend and frontend after env changes.
 
 ## Open on Mobile (same Wi-Fi)
 
@@ -68,3 +115,5 @@ PolyApp is a browser-based mini-app hub for personal tracking tools.
    - Uvicorn: `http://<your-ip>:8000`
    - Vite dev: `http://<your-ip>:5173`
 4. If prompted, allow the app through Windows Firewall for Private networks.
+
+
