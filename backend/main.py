@@ -16,6 +16,7 @@ from backend.core.settings import CORS_ORIGINS, SESSION_SECRET_KEY
 from backend.services.auth import router as auth_router
 from backend.services.reps import router as reps_router
 from backend.services.routine import router as routine_router
+from backend.services.vocab import router as vocab_router
 from backend.services.wakeup import router as wakeup_router
 from backend.services.weight import router as weight_router
 
@@ -52,6 +53,7 @@ app.include_router(reps_router)
 app.include_router(wakeup_router)
 app.include_router(weight_router)
 app.include_router(routine_router)
+app.include_router(vocab_router)
 
 
 @app.get("/api/health")

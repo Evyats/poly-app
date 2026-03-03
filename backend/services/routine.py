@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -8,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.core.auth import get_current_user
-from backend.core.bootstrap import DEFAULT_TASKS, ensure_routine_day
+from backend.core.bootstrap import ensure_routine_day
 from backend.core.db import get_db
 from backend.core.models import RoutineTask, User
 
@@ -16,7 +17,10 @@ router = APIRouter(prefix="/api/routine", tags=["routine"])
 
 
 class TaskUpdate(BaseModel):
-    id: str
+    id: str | None = None
+    label: str = Field(min_length=1, max_length=255)
+    isTimed: bool
+    initialSeconds: int = Field(ge=0)
     remainingSeconds: int = Field(ge=0)
     completed: bool
 
@@ -33,12 +37,9 @@ def _day_payload(db: Session, user: User, target_day: date) -> dict:
         db.scalars(
             select(RoutineTask)
             .where(RoutineTask.routine_day_id == routine_day.id)
-            .order_by(RoutineTask.task_id)
+            .order_by(RoutineTask.id)
         )
     )
-
-    task_by_id = {task.task_id: task for task in tasks}
-    ordered = [task_by_id.get(definition["id"]) for definition in DEFAULT_TASKS]
 
     return {
         "date": routine_day.entry_date.isoformat(),
@@ -52,8 +53,7 @@ def _day_payload(db: Session, user: User, target_day: date) -> dict:
                 "remainingSeconds": task.remaining_seconds,
                 "completed": task.completed,
             }
-            for task in ordered
-            if task is not None
+            for task in tasks
         ],
     }
 
@@ -71,13 +71,27 @@ def put_today(payload: RoutineUpdate, db: Session = Depends(get_db), user: User 
     routine_day = ensure_routine_day(db, user, today)
     routine_day.study_seconds = payload.studySeconds
 
-    by_id = {item.id: item for item in payload.tasks}
-    tasks = list(db.scalars(select(RoutineTask).where(RoutineTask.routine_day_id == routine_day.id)))
-    for task in tasks:
-        incoming = by_id.get(task.task_id)
-        if incoming is not None:
-            task.remaining_seconds = incoming.remainingSeconds
-            task.completed = incoming.completed
+    existing_tasks = list(db.scalars(select(RoutineTask).where(RoutineTask.routine_day_id == routine_day.id)))
+    existing_by_id = {task.task_id: task for task in existing_tasks}
+    keep_ids: set[str] = set()
+
+    for incoming in payload.tasks:
+        task_id = incoming.id or uuid4().hex[:8]
+        task = existing_by_id.get(task_id)
+        if task is None:
+            task = RoutineTask(routine_day_id=routine_day.id, task_id=task_id)
+            db.add(task)
+
+        task.label = incoming.label.strip()
+        task.is_timed = incoming.isTimed
+        task.initial_seconds = max(0, incoming.initialSeconds)
+        task.remaining_seconds = max(0, incoming.remainingSeconds)
+        task.completed = incoming.completed
+        keep_ids.add(task_id)
+
+    for task in existing_tasks:
+        if task.task_id not in keep_ids:
+            db.delete(task)
 
     db.commit()
     return _day_payload(db, user, today)

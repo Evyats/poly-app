@@ -45,3 +45,15 @@ export type AuthUser = {
   email: string | null;
   username: string;
 };
+
+export type VocabGroup = {
+  id: number;
+  name: string;
+  packCount: number;
+};
+
+export type VocabPack = {
+  id: number;
+  englishWords: string[];
+  hebrewWords: string[];
+};

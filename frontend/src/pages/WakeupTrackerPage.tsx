@@ -17,10 +17,20 @@ import type { WakeupEntry } from "../lib/types";
 
 type FilterMode = "all" | "month" | "year";
 
+function getTodayDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function getNowTime() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
 export function WakeupTrackerPage() {
   const [entries, setEntries] = useState<WakeupEntry[]>([]);
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("07:00");
+  const [date, setDate] = useState(getTodayDate);
+  const [time, setTime] = useState(getNowTime);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [monthFilter, setMonthFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");

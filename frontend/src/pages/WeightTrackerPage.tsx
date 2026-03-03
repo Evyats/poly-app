@@ -12,14 +12,23 @@ type WeightChartPoint = {
   trend: number;
 };
 
+function getTodayDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 export function WeightTrackerPage() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(getTodayDate);
   const [weight, setWeight] = useState("");
 
   async function load() {
     const data = await api.get<{ entries: WeightEntry[] }>("/api/weight/entries");
     setEntries(data.entries);
+    if (data.entries.length > 0) {
+      const mostRecent = data.entries.reduce((latest, entry) => (entry.date > latest.date ? entry : latest));
+      setWeight(String(mostRecent.weight));
+    }
   }
 
   useEffect(() => {

@@ -14,6 +14,7 @@ const navItems = [
   { to: "/wakeup", label: "Wake-up" },
   { to: "/weight", label: "Weight" },
   { to: "/routine", label: "Routine" },
+  { to: "/vocab", label: "Vocab" },
 ];
 
 export function Layout({ theme, onToggleTheme, user, onLogout }: LayoutProps) {
@@ -67,3 +68,4 @@ export function Layout({ theme, onToggleTheme, user, onLogout }: LayoutProps) {
     </div>
   );
 }
+

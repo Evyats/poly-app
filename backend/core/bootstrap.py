@@ -120,7 +120,33 @@ def ensure_routine_day(db: Session, user: User, day: date) -> RoutineDay:
         routine_day = RoutineDay(user_id=user.id, entry_date=day, study_seconds=0)
         db.add(routine_day)
         db.flush()
-        for task in DEFAULT_TASKS:
+
+        previous_day = db.scalar(
+            select(RoutineDay)
+            .where(RoutineDay.user_id == user.id, RoutineDay.entry_date < day)
+            .order_by(RoutineDay.entry_date.desc())
+        )
+        if previous_day is not None:
+            previous_tasks = list(
+                db.scalars(
+                    select(RoutineTask)
+                    .where(RoutineTask.routine_day_id == previous_day.id)
+                    .order_by(RoutineTask.id)
+                )
+            )
+            seed_tasks = [
+                {
+                    "id": task.task_id,
+                    "label": task.label,
+                    "isTimed": task.is_timed,
+                    "initialSeconds": task.initial_seconds,
+                }
+                for task in previous_tasks
+            ]
+        else:
+            seed_tasks = DEFAULT_TASKS
+
+        for task in seed_tasks:
             db.add(
                 RoutineTask(
                     routine_day_id=routine_day.id,

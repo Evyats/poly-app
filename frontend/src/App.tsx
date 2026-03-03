@@ -9,6 +9,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RepsTrackerPage } from "./pages/RepsTrackerPage";
 import { RoutineTrackerPage } from "./pages/RoutineTrackerPage";
 import { WakeupTrackerPage } from "./pages/WakeupTrackerPage";
+import { VocabTrainerPage } from "./pages/VocabTrainerPage";
 import { WeightTrackerPage } from "./pages/WeightTrackerPage";
 
 type MeResponse = {
@@ -80,6 +81,7 @@ function App() {
           <Route path="wakeup" element={<WakeupTrackerPage />} />
           <Route path="weight" element={<WeightTrackerPage />} />
           <Route path="routine" element={<RoutineTrackerPage />} />
+          <Route path="vocab" element={<VocabTrainerPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -88,3 +90,4 @@ function App() {
 }
 
 export default App;
+

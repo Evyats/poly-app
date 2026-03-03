@@ -18,7 +18,7 @@ ALLOWED_EMAILS = [email.lower() for email in _split_csv(os.getenv("ALLOWED_EMAIL
 CORS_ORIGINS = _split_csv(
     os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000",
+        "http://localhost:4173,http://127.0.0.1:4173,http://localhost:8765,http://127.0.0.1:8765",
     )
 )
 
@@ -26,5 +26,10 @@ AUTH_MODE = os.getenv("AUTH_MODE", "oauth").strip().lower()
 if AUTH_MODE not in {"oauth", "dev_auto"}:
     AUTH_MODE = "oauth"
 
-DEFAULT_APP_USERNAME = os.getenv("DEFAULT_APP_USERNAME", "evyats").strip() or "evyats"
-DEFAULT_APP_EMAIL = os.getenv("DEFAULT_APP_EMAIL", "").strip().lower() or None
+DEFAULT_APP_USERNAME = os.getenv("DEFAULT_APP_USERNAME", "local_dev_user").strip() or "local_dev_user"
+DEFAULT_APP_EMAIL = (
+    os.getenv("DEFAULT_APP_EMAIL", "local.dev.user@example.com").strip().lower()
+    or "local.dev.user@example.com"
+)
+
+

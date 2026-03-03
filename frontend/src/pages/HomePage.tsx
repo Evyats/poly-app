@@ -5,6 +5,11 @@ const apps = [
   { path: "/wakeup", title: "Wake-up Tracker", desc: "Log wake-up times and inspect trends by month/year." },
   { path: "/weight", title: "Weight Tracker", desc: "Track weight entries with moving average and linear trend." },
   { path: "/routine", title: "Daily Routine", desc: "Stopwatch + daily tasks with countdown completion timers." },
+  {
+    path: "/vocab",
+    title: "Vocabulary Trainer",
+    desc: "Manage English-Hebrew mappings and practice matching rounds.",
+  },
 ];
 
 export function HomePage() {
@@ -29,3 +34,4 @@ export function HomePage() {
     </section>
   );
 }
+

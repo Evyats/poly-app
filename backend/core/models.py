@@ -19,6 +19,13 @@ class User(Base):
     wakeup_entries: Mapped[list[WakeupEntry]] = relationship(back_populates="user", cascade="all, delete-orphan")
     weight_entries: Mapped[list[WeightEntry]] = relationship(back_populates="user", cascade="all, delete-orphan")
     routine_days: Mapped[list[RoutineDay]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    vocab_groups: Mapped[list[VocabGroup]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    vocab_english_words: Mapped[list[VocabEnglishWord]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    vocab_hebrew_words: Mapped[list[VocabHebrewWord]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class AllowedEmail(Base):
@@ -105,3 +112,98 @@ class RoutineTask(Base):
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     routine_day: Mapped[RoutineDay] = relationship(back_populates="tasks")
+
+
+class VocabGroup(Base):
+    __tablename__ = "vocab_groups"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_vocab_group_user_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="vocab_groups")
+    packs: Mapped[list[VocabPack]] = relationship(back_populates="group", cascade="all, delete-orphan")
+
+
+class VocabEnglishWord(Base):
+    __tablename__ = "vocab_english_words"
+    __table_args__ = (UniqueConstraint("user_id", "text", name="uq_vocab_english_user_text"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    text: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="vocab_english_words")
+    pack_links: Mapped[list[VocabPackEnglishWord]] = relationship(
+        back_populates="english_word", cascade="all, delete-orphan"
+    )
+
+
+class VocabHebrewWord(Base):
+    __tablename__ = "vocab_hebrew_words"
+    __table_args__ = (UniqueConstraint("user_id", "text", name="uq_vocab_hebrew_user_text"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    text: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="vocab_hebrew_words")
+    pack_links: Mapped[list[VocabPackHebrewWord]] = relationship(
+        back_populates="hebrew_word", cascade="all, delete-orphan"
+    )
+
+
+class VocabPack(Base):
+    __tablename__ = "vocab_packs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("vocab_groups.id", ondelete="CASCADE"), nullable=False)
+
+    group: Mapped[VocabGroup] = relationship(back_populates="packs")
+    english_links: Mapped[list[VocabPackEnglishWord]] = relationship(
+        back_populates="pack", cascade="all, delete-orphan"
+    )
+    hebrew_links: Mapped[list[VocabPackHebrewWord]] = relationship(
+        back_populates="pack", cascade="all, delete-orphan"
+    )
+
+
+class VocabPackEnglishWord(Base):
+    __tablename__ = "vocab_pack_english_words"
+    __table_args__ = (
+        UniqueConstraint(
+            "pack_id",
+            "english_word_id",
+            name="uq_vocab_pack_english_word",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pack_id: Mapped[int] = mapped_column(ForeignKey("vocab_packs.id", ondelete="CASCADE"), nullable=False)
+    english_word_id: Mapped[int] = mapped_column(
+        ForeignKey("vocab_english_words.id", ondelete="CASCADE"), nullable=False
+    )
+
+    pack: Mapped[VocabPack] = relationship(back_populates="english_links")
+    english_word: Mapped[VocabEnglishWord] = relationship(back_populates="pack_links")
+
+
+class VocabPackHebrewWord(Base):
+    __tablename__ = "vocab_pack_hebrew_words"
+    __table_args__ = (
+        UniqueConstraint(
+            "pack_id",
+            "hebrew_word_id",
+            name="uq_vocab_pack_hebrew_word",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pack_id: Mapped[int] = mapped_column(ForeignKey("vocab_packs.id", ondelete="CASCADE"), nullable=False)
+    hebrew_word_id: Mapped[int] = mapped_column(
+        ForeignKey("vocab_hebrew_words.id", ondelete="CASCADE"), nullable=False
+    )
+
+    pack: Mapped[VocabPack] = relationship(back_populates="hebrew_links")
+    hebrew_word: Mapped[VocabHebrewWord] = relationship(back_populates="pack_links")
