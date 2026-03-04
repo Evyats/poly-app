@@ -1,126 +1,105 @@
 # PolyApp
 
-PolyApp is a browser-based mini-app hub for personal tracking tools.
+PolyApp is a browser mini-app hub for personal tracking tools (reps, wake-up, weight, routine, vocabulary trainer).
 
 ## Stack
 
-- Frontend: React + TypeScript + Tailwind CSS + Recharts
-- Backend: FastAPI microservices (reps, wake-up, weight, routine) + SQLAlchemy
-- Database: PostgreSQL (Docker Compose)
-- Serving: `uvicorn` for backend APIs; can also serve built React app from FastAPI
+- Frontend: React + TypeScript + Tailwind + Recharts
+- Backend: FastAPI + SQLAlchemy
+- DB: PostgreSQL
+- Auth: Google OAuth + allowed-email whitelist + session cookie
 
-## Auth
+## Production-Oriented Changes Included
 
-- Two auth behaviors are supported via config (`AUTH_MODE`):
-  - `oauth`: real Google login
-  - `dev_auto`: automatic login as a default DB user (for local testing)
-- Only emails in the whitelist can access the app.
-- Whitelist is stored in DB table `allowed_emails` and seeded from `ALLOWED_EMAILS` env var on startup.
-- Sessions are cookie-based (server-side session middleware).
-- Data is user-scoped in SQL tables by `user_id`.
+- Alembic migrations (instead of runtime `create_all` schema creation)
+- Gunicorn config for FastAPI app workers
+- Nginx configs for:
+  - static frontend serving
+  - `/api` reverse proxy
+  - HTTPS variant
+- Secure cookie settings via env (`SESSION_COOKIE_SECURE`, `SESSION_COOKIE_SAMESITE`, `SESSION_COOKIE_NAME`)
+- Structured JSON logging in backend
 
-## Auth Config (backend `.env`)
+## Backend Env Vars (`.env`)
 
+Start from `.env.example`.
+
+Required/important:
+
+- `DATABASE_URL=...`
+- `SESSION_SECRET_KEY=<long-random-secret>` (required; app fails if missing)
+- `ENVIRONMENT=development|production`
+- `SESSION_COOKIE_SECURE=true|false`
+- `SESSION_COOKIE_SAMESITE=lax|strict|none`
+- `CORS_ORIGINS=https://your-domain.com`
 - `AUTH_MODE=oauth|dev_auto`
-- `DEFAULT_APP_USERNAME=local_dev_user`
-- `DEFAULT_APP_EMAIL=local.dev.user@example.com`
-- `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` (required for `oauth`)
-- `ALLOWED_EMAILS=a@x.com,b@y.com` (required for `oauth`)
-- `SESSION_SECRET_KEY=<long-random-secret>`
+- `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` (for oauth mode)
 
-## Features
+## Local Development
 
-- Home hub with navigation to all mini apps.
-- Global light/dark theme toggle.
-- Reps Tracker:
-  - tabs (add/remove/select/rename)
-  - tab-specific exercises
-  - direct reps edits, +/- by step, step size changes, reset, delete, reorder
-  - `All` combined exercises view
-- Wake-up Tracker:
-  - one entry per date (replace on duplicate date)
-  - date+time form
-  - chart with filter by all/month/year
-  - point select + delete
-  - reset to predefined seed data
-  - manual Y-axis max cap with auto/reset
-- Weight Tracker:
-  - one entry per date (replace on duplicate date)
-  - trend graph with raw line, moving average, linear trend line
-- Daily Routine Tracker:
-  - central study stopwatch with hundredths display (start/pause/reset, click-to-toggle, paused-only manual edit)
-  - editable task list (rename tasks, toggle timed/non-timed, delete tasks)
-  - add new tasks with optional timer duration
-  - timed task countdowns with start/pause/reset
-  - pleasant sound + auto-complete when timer reaches zero
-- Vocabulary Trainer:
-  - create/delete word groups
-  - add/delete word packs where each pack has many English words and many Hebrew words (minimum one on each side)
-  - matching game in rounds of 10 packs (left English, right Hebrew)
-
-## Run (development)
-
-1. Start PostgreSQL (Docker):
+1. Start Postgres:
    - `docker compose up postgres`
-2. Backend:
+2. Create venv + install backend deps:
    - `python -m venv .venv`
-   - `.venv\\Scripts\\activate`
+   - `.venv\Scripts\activate`
    - `pip install -r backend/requirements.txt`
-   - create `.env` in repo root (see `.env.example`)
+3. Create `.env` in repo root (copy `.env.example` and edit values).
+4. Run DB migrations:
+   - `alembic upgrade head`
+5. Run backend:
    - `uvicorn backend.main:app --reload --port 8765`
-3. Frontend (separate terminal):
+6. Run frontend (another terminal):
    - `cd frontend`
    - `npm install`
-   - create `frontend/.env` (see `frontend/.env.example`)
    - `npm run dev`
-4. Open `http://localhost:4173`
+7. Open:
+   - `http://localhost:4173`
 
-## Run via Uvicorn (serve built React from FastAPI)
+## Local Production-Like Run (Gunicorn + Nginx style)
 
 1. Build frontend:
    - `cd frontend`
    - `npm install`
    - `npm run build`
-2. Ensure PostgreSQL is running:
-   - `docker compose up postgres`
-3. Start backend from repo root:
-   - `uvicorn backend.main:app --reload --port 8765`
-4. Open `http://localhost:8765`
+2. Install backend deps + migrate:
+   - `pip install -r backend/requirements.txt`
+   - `alembic upgrade head`
+3. Run backend with Gunicorn:
+   - `gunicorn -c backend/gunicorn_conf.py backend.main:app`
+4. Use nginx config template:
+   - `deploy/nginx/polyapp.conf`
+   - HTTPS variant: `deploy/nginx/polyapp-https.conf`
 
-## Google OAuth Setup
+## Alembic
 
-1. In Google Cloud Console, configure OAuth consent screen:
-   - choose `External` (or `Internal` if using Workspace only)
-   - add your app name/support email
-   - add test users if app is in testing mode
-2. Create OAuth Client ID (Web application).
-3. Add Authorized JavaScript origins:
-   - `http://localhost:4173`
-   - `http://127.0.0.1:4173`
-   - `http://localhost:8765`
-   - `http://127.0.0.1:8765`
-4. Add backend and frontend env values:
-   - repo `.env`:
-     - `GOOGLE_CLIENT_ID=...apps.googleusercontent.com`
-     - `ALLOWED_EMAILS=you@example.com,friend@example.com`
-     - `SESSION_SECRET_KEY=<long-random-secret>`
-   - `frontend/.env`:
-     - `VITE_GOOGLE_CLIENT_ID=...apps.googleusercontent.com`
-5. Restart backend and frontend after env changes.
+- Current initial migration:
+  - `alembic/versions/20260304_000001_initial_schema.py`
+- Apply migrations:
+  - `alembic upgrade head`
+- Create new migration after model changes:
+  - `alembic revision -m "describe-change"`
+  - then edit the revision file and run `alembic upgrade head`
 
-## Open on Mobile (same Wi-Fi)
+## AWS EC2 + RDS Checklist (Your Chosen Path)
 
-1. Find your computer IPv4 address:
-   - Windows: `ipconfig`
-   - Use the `IPv4 Address` of your active Wi-Fi adapter (example: `192.168.1.23`)
-2. Start server with LAN binding:
-   - Uvicorn mode: `uvicorn backend.main:app --host 0.0.0.0 --port 8765`
-   - Vite dev mode: `cd frontend && npm run dev -- --host 0.0.0.0 --port 4173`
-3. Open from phone browser:
-   - Uvicorn: `http://<your-ip>:8765`
-   - Vite dev: `http://<your-ip>:4173`
-4. If prompted, allow the app through Windows Firewall for Private networks.
+1. Provision RDS PostgreSQL.
+2. Provision EC2.
+3. Security groups:
+   - EC2: allow `80/443` from internet, `22` from your IP only.
+   - RDS: allow DB port from EC2 security group only.
+4. Clone app on EC2 and set `.env` with production values.
+5. Set `DATABASE_URL` to RDS endpoint.
+6. Install backend dependencies and run `alembic upgrade head`.
+7. Build frontend (`npm run build`).
+8. Start backend via gunicorn (`backend/gunicorn_conf.py`).
+9. Configure nginx with one of the provided templates.
+10. Add domain DNS to EC2 and enable HTTPS certs (Let's Encrypt).
+11. Keep `SESSION_COOKIE_SECURE=true` in production.
+12. Keep `CORS_ORIGINS` strict (only your real domain).
 
+## Notes
 
-
-
+- Backend now expects DB schema to exist via Alembic migration.
+- If migrations were not run, startup can fail with:
+  - `Database schema missing. Run: alembic upgrade head`
+- For small private usage, `.env`-based secret storage on EC2 is acceptable if file permissions are locked down.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -26,12 +26,11 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def init_db(max_attempts: int = 15, sleep_seconds: float = 1.0) -> None:
-    from backend.core import models  # noqa: F401
-
+def wait_for_db(max_attempts: int = 15, sleep_seconds: float = 1.0) -> None:
     for attempt in range(1, max_attempts + 1):
         try:
-            Base.metadata.create_all(bind=engine)
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
             return
         except OperationalError:
             if attempt == max_attempts:

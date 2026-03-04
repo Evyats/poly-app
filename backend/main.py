@@ -8,11 +8,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import ProgrammingError
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.core.bootstrap import seed_default_data
-from backend.core.db import init_db
-from backend.core.settings import CORS_ORIGINS, SESSION_SECRET_KEY
+from backend.core.db import wait_for_db
+from backend.core.logging_config import setup_logging
+from backend.core.settings import (
+    CORS_ORIGINS,
+    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SAMESITE,
+    SESSION_COOKIE_SECURE,
+    SESSION_SECRET_KEY,
+)
 from backend.services.auth import router as auth_router
 from backend.services.reps import router as reps_router
 from backend.services.routine import router as routine_router
@@ -23,12 +31,16 @@ from backend.services.weight import router as weight_router
 # Windows can resolve .js to text/plain; force module-safe MIME types.
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("application/javascript", ".mjs")
+setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()
-    seed_default_data()
+    wait_for_db()
+    try:
+        seed_default_data()
+    except ProgrammingError as exc:
+        raise RuntimeError("Database schema missing. Run: alembic upgrade head") from exc
     yield
 
 
@@ -36,8 +48,9 @@ app = FastAPI(title="PolyApp API", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET_KEY,
-    same_site="lax",
-    https_only=False,
+    same_site=SESSION_COOKIE_SAMESITE,
+    https_only=SESSION_COOKIE_SECURE,
+    session_cookie=SESSION_COOKIE_NAME,
 )
 app.add_middleware(
     CORSMiddleware,
