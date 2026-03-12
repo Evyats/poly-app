@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, time
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from backend.core.db import SessionLocal
@@ -178,6 +178,9 @@ def seed_allowed_emails(db: Session) -> None:
 
 def seed_default_data() -> None:
     with SessionLocal() as db:
+        # Gunicorn starts multiple workers; use a transaction-scoped advisory lock
+        # so only one worker seeds shared startup data at a time.
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 731245})
         seed_allowed_emails(db)
         user = get_default_user(db)
         ensure_default_reps_tab(db, user)
