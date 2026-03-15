@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 
 import { api } from "./api/client";
+import { LoadingView } from "./components/LoadingView";
 import { Layout } from "./components/Layout";
 import type { AuthUser } from "./lib/types";
-import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
-import { RepsTrackerPage } from "./pages/RepsTrackerPage";
-import { RoutineTrackerPage } from "./pages/RoutineTrackerPage";
-import { WakeupTrackerPage } from "./pages/WakeupTrackerPage";
-import { VocabTrainerPage } from "./pages/VocabTrainerPage";
-import { WeightTrackerPage } from "./pages/WeightTrackerPage";
+
+const HomePage = lazy(() => import("./pages/HomePage").then((module) => ({ default: module.HomePage })));
+const RepsTrackerPage = lazy(() => import("./pages/RepsTrackerPage").then((module) => ({ default: module.RepsTrackerPage })));
+const RoutineTrackerPage = lazy(() => import("./pages/RoutineTrackerPage").then((module) => ({ default: module.RoutineTrackerPage })));
+const WakeupTrackerPage = lazy(() => import("./pages/WakeupTrackerPage").then((module) => ({ default: module.WakeupTrackerPage })));
+const VocabTrainerPage = lazy(() => import("./pages/VocabTrainerPage").then((module) => ({ default: module.VocabTrainerPage })));
+const WeightTrackerPage = lazy(() => import("./pages/WeightTrackerPage").then((module) => ({ default: module.WeightTrackerPage })));
 
 type MeResponse = {
   authenticated: boolean;
@@ -51,13 +54,20 @@ function App() {
   }, []);
 
   if (authLoading) {
-    return <p className="p-6">Loading...</p>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="glass-panel rounded-3xl px-8 py-6">
+          <p className="text-sm text-muted-foreground">Loading PolyApp...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950">
+      <div className="min-h-screen px-4 py-8">
         <LoginPage onLoggedIn={refreshAuth} />
+        <Toaster richColors position="top-right" theme={theme} />
       </div>
     );
   }
@@ -76,15 +86,58 @@ function App() {
             />
           }
         >
-          <Route index element={<HomePage />} />
-          <Route path="reps" element={<RepsTrackerPage />} />
-          <Route path="wakeup" element={<WakeupTrackerPage />} />
-          <Route path="weight" element={<WeightTrackerPage />} />
-          <Route path="routine" element={<RoutineTrackerPage />} />
-          <Route path="vocab" element={<VocabTrainerPage />} />
+          <Route
+            index
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <HomePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="reps"
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <RepsTrackerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="wakeup"
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <WakeupTrackerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="weight"
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <WeightTrackerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="routine"
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <RoutineTrackerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="vocab"
+            element={
+              <Suspense fallback={<LoadingView label="Loading page..." />}>
+                <VocabTrainerPage />
+              </Suspense>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      <Toaster richColors position="top-right" theme={theme} />
     </BrowserRouter>
   );
 }
